@@ -11,7 +11,6 @@ namespace SteadyHands
     public class GlobalSettingsClass
     {
         public bool needsQuill = true;
-        public bool isEnabled = true;
     }
 
     public class SteadyHandsMod : Mod, IGlobalSettings<GlobalSettingsClass>, IMenuMod, ITogglableMod
@@ -59,13 +58,13 @@ namespace SteadyHands
 
         private bool CheckQuill(string name, bool orig)
         {
-            return (name == "hasQuill" && saveSettings.isEnabled && !saveSettings.needsQuill) ? true : orig;
+            return (name == "hasQuill" && !saveSettings.needsQuill) ? true : orig;
         }
 
         private void SceneManager_AddSceneMapped(On.SceneManager.orig_AddSceneMapped orig, SceneManager self)
         {
             orig(self);
-            if (saveSettings.isEnabled) ForceUpdateGameMap();
+            ForceUpdateGameMap();
         }
 
         private void GameMap_Start(On.GameMap.orig_Start orig, GameMap self)
