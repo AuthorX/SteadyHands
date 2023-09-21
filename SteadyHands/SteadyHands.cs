@@ -8,12 +8,23 @@ using UnityEngine.Assertions;
 
 namespace SteadyHands
 {
-    public class SteadyHandsMod : Mod
+    public class LocalSettingsClass
+    {
+        public bool needsQuill = true;
+        public bool isEnabled = true;
+    }
+
+    public class SteadyHandsMod : Mod, ILocalSettings<LocalSettingsClass>
     {
         private static SteadyHandsMod? _instance;
         private static GameManager? gm;
         private static GameMap? map;
         private static GameObject? msg;
+
+        public LocalSettingsClass saveSettings { get; set; } = new LocalSettingsClass();
+        public void OnLoadLocal(LocalSettingsClass s) => this.saveSettings = s;
+        public LocalSettingsClass OnSaveLocal() => this.saveSettings;
+
 
         internal static SteadyHandsMod Instance
         {
@@ -37,18 +48,22 @@ namespace SteadyHands
         //public override void Initialize(Dictionary<string, Dictionary<string, GameObject>> preloadedObjects)
         public override void Initialize()
         {
-            Log("Initializing");
-
             gm = GameManager.instance;
             On.GameMap.Start += GameMap_Start;
             On.SceneManager.AddSceneMapped += SceneManager_AddSceneMapped;
+            ModHooks.GetPlayerBoolHook += CheckQuill;
             Log("Initialized");
+        }
+
+        private bool CheckQuill(string name, bool orig)
+        {
+            return (name == "hasQuill" && saveSettings.isEnabled && !saveSettings.needsQuill) ? true : orig;
         }
 
         private void SceneManager_AddSceneMapped(On.SceneManager.orig_AddSceneMapped orig, SceneManager self)
         {
             orig(self);
-            ForceUpdateGameMap();
+            if (saveSettings.isEnabled) ForceUpdateGameMap();
         }
 
         private void GameMap_Start(On.GameMap.orig_Start orig, GameMap self)
@@ -61,7 +76,7 @@ namespace SteadyHands
         {
             bool updated = (gm?.UpdateGameMap() == true);
             map?.SetupMap();
-            //Log("UpdateGameMap() = " + updated);
+            LogDebug("UpdateGameMap() = " + updated);
             //if(updated)
             //{
             //    GameObject go = GameObject.Instantiate(msg);
