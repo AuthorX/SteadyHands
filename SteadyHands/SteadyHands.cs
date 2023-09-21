@@ -41,9 +41,16 @@ namespace SteadyHands
 
             gm = GameManager.instance;
             On.GameMap.Start += GameMap_Start;
-            On.GameManager.GetCurrentMapZone += GameMap_GetCurrentMapZone;
+            //On.GameManager.GetCurrentMapZone += GameMap_GetCurrentMapZone;
+            On.SceneManager.AddSceneMapped += SceneManager_AddSceneMapped;
             //On.GameMap.WorldMap += GameMap_WorldMap;
             Log("Initialized");
+        }
+
+        private void SceneManager_AddSceneMapped(On.SceneManager.orig_AddSceneMapped orig, SceneManager self)
+        {
+            orig(self);
+            ForceUpdateGameMap();
         }
 
         private void GameMap_Start(On.GameMap.orig_Start orig, GameMap self)
@@ -68,7 +75,7 @@ namespace SteadyHands
         {
             bool updated = (gm?.UpdateGameMap() == true);
             map?.SetupMap();
-            //Log("UpdateGameMap() = " + updated);
+            Log("UpdateGameMap() = " + updated);
             //if(updated)
             //{
             //    GameObject go = GameObject.Instantiate(msg);
