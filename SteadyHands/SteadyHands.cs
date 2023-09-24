@@ -2,13 +2,8 @@ using Modding;
 using System;
 using Satchel;
 using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.Assertions;
-using static PlayMakerUGuiComponentProxy;
-using System.Reflection;
 using HutongGames.PlayMaker;
 using HutongGames.PlayMaker.Actions;
-using System.Runtime.Remoting.Metadata.W3cXsd2001;
 using MonoMod.Cil;
 using Mono.Cecil.Cil;
 using System.Linq;
@@ -23,7 +18,7 @@ namespace SteadyHands
 
     public class LocalSettingsClass
     {
-        public List<string> seenAreas = new List<string>();
+        public List<string> seenAreas = new();
     }
 
     public class SteadyHandsMod : Mod, IGlobalSettings<GlobalSettingsClass>, IMenuMod, ITogglableMod
@@ -33,7 +28,7 @@ namespace SteadyHands
         private static GameMap? map;
         //private static PlayerData playerData = PlayerData.instance;
         private static PlayMakerFSM? quickmapFSM;
-        private static string[] mapBools = {
+        private static readonly string[] mapBools = {
             "mapCrossroads",
             "mapGreenpath",
             "mapFogCanyon",
@@ -48,30 +43,14 @@ namespace SteadyHands
             "mapRestingGround",
             "mapAbyss"
         };
-        private static string[] mapStates =
-        {
-            "Crossroads",
-            "Greenpath",
-            "Cliffs",
-            "Fungal Wastes",
-            "City",
-            "Mines",
-            "Resting Grounds",
-            "Fog Canyon",
-            "Royal Gardens",
-            "Deepnest",
-            "Waterways",
-            "Abyss",
-            "Outskirts"
-        };
 
         public GlobalSettingsClass gs { get; set; } = new GlobalSettingsClass();
-        public void OnLoadGlobal(GlobalSettingsClass s) => this.gs = s;
-        public GlobalSettingsClass OnSaveGlobal() => this.gs;
+        public void OnLoadGlobal(GlobalSettingsClass s) => gs = s;
+        public GlobalSettingsClass OnSaveGlobal() => gs;
 
         public LocalSettingsClass ls { get; set; } = new LocalSettingsClass();
-        public void OnLoadLocal(LocalSettingsClass s) => this.ls = s;
-        public LocalSettingsClass OnSaveLocal() => this.ls;
+        public void OnLoadLocal(LocalSettingsClass s) => ls = s;
+        public LocalSettingsClass OnSaveLocal() => ls;
 
 
         internal static SteadyHandsMod Instance
@@ -110,7 +89,7 @@ namespace SteadyHands
             Log("Initialized");
         }
 
-        private void ILHookCustomMapBools(MonoMod.Cil.ILContext il)
+        private void ILHookCustomMapBools(ILContext il)
         {
             ILCursor cursor = new ILCursor(il).Goto(0);
             while (cursor.TryGotoNext(
@@ -122,7 +101,6 @@ namespace SteadyHands
                 var boolName = cursor.Next.Operand;
                 if (mapBools.Contains(boolName))
                 {
-                    LogDebug("ILHook for GetBool(\"" + boolName + "\")");
                     cursor.Remove();
                     cursor.Emit(OpCodes.Ldstr,boolName + "_custom");
                 }
@@ -159,9 +137,8 @@ namespace SteadyHands
             foreach (FsmState state in states)
             {
                 var action = state.GetFirstActionOfType<PlayerDataBoolTest>();
-                Log("checking list of states, trying to get <PlayerDataBoolTest> action for " + state.Name + ": " + (action is null));
                 if(action is not null && mapBools.Contains(action.boolName.ToString()))
-                    action.boolName = action.boolName + "_custom";
+                    action.boolName += "_custom";
             }
             LogDebug("Finished editing Quick Map FSM");
         }
@@ -170,70 +147,31 @@ namespace SteadyHands
         {
             orig(self);
             string mapName = GetCurrentMapName(self.mapZone.ToString());
-            LogDebug("Got current mapName: " + mapName);
             if (mapName != "" && !ls.seenAreas.Contains(mapName)) ls.seenAreas.Add(mapName);
-            LogDebug("Set " + mapName + " in seenAreas");
-            LogDebug(string.Join(", ", ls.seenAreas));
             ForceUpdateGameMap();
         }
 
         private string GetCurrentMapName(string mapZoneName)
         {
-            Log("Got current mapZoneName: " + mapZoneName);
-            switch (mapZoneName)
+            return mapZoneName switch
             {
-                case "CLIFFS":
-                    return "mapCliffs";
-                case "CROSSROADS":
-                    return "mapCrossroads";
-                case "GREEN_PATH":
-                case "ACID_LAKE":
-                    return "mapGreenpath";
-                case "ROYAL_GARDENS":
-                    return "mapRoyalGardens";
-                case "FOG_CANYON":
-                    return "mapFogCanyon";
-                case "WASTES":
-                case "QUEENS_STATION":
-                case "MANTIS_VILLAGE":
-                    return "mapFungalWastes";
-                case "DEEPNEST":
-                case "RUINED_TRAMWAY":
-                case "DISTANT_VILLAGE":
-                    return "mapDeepnest";
-                case "OUTSKIRTS":
-                case "HIVE":
-                case "COLOSSEUM":
-                case "WYRMSKIN":
-                    return "mapOutskirts";
-                case "PALACE_GROUNDS":
-                    return "";
-                case "MINES":
-                case "PEAK":
-                    return "mapMines";
-                case "RESTING_GROUNDS":
-                case "GLADE":
-                case "BLUE_LAKE":
-                    return "mapRestingGrounds";
-                case "CITY":
-                case "KINGS_STATION":
-                case "MAGE_TOWER":
-                case "SOUL_SOCIETY":
-                case "LURIENS_TOWER":
-                case "LOVE_TOWER":
-                    return "mapCity";
-                case "ABYSS":
-                case "ABYSS_DEEP":
-                    return "mapAbyss";
-                case "ROYAL_QUARTER":
-                    return "";
-                case "WATERWAYS":
-                case "ISMAS_GROVE":
-                case "GODSEEKER_WASTE":
-                    return "mapWaterways";
-            default:
-                    return "";
-            }
+                "CLIFFS" => "mapCliffs",
+                "CROSSROADS" => "mapCrossroads",
+                "GREEN_PATH" or "ACID_LAKE" => "mapGreenpath",
+                "ROYAL_GARDENS" => "mapRoyalGardens",
+                "FOG_CANYON" => "mapFogCanyon",
+                "WASTES" or "QUEENS_STATION" or "MANTIS_VILLAGE" => "mapFungalWastes",
+                "DEEPNEST" or "RUINED_TRAMWAY" or "DISTANT_VILLAGE" => "mapDeepnest",
+                "OUTSKIRTS" or "HIVE" or "COLOSSEUM" or "WYRMSKIN" => "mapOutskirts",
+                "PALACE_GROUNDS" => "",
+                "MINES" or "PEAK" => "mapMines",
+                "RESTING_GROUNDS" or "GLADE" or "BLUE_LAKE" => "mapRestingGrounds",
+                "CITY" or "KINGS_STATION" or "MAGE_TOWER" or "SOUL_SOCIETY" or "LURIENS_TOWER" or "LOVE_TOWER" => "mapCity",
+                "ABYSS" or "ABYSS_DEEP" => "mapAbyss",
+                "ROYAL_QUARTER" => "",
+                "WATERWAYS" or "ISMAS_GROVE" or "GODSEEKER_WASTE" => "mapWaterways",
+                _ => "",
+            };
         }
         
         private void GameMap_Start(On.GameMap.orig_Start orig, GameMap self)
@@ -244,9 +182,8 @@ namespace SteadyHands
 
         private void ForceUpdateGameMap()
         {
-            bool updated = (gm?.UpdateGameMap() == true);
+            gm?.UpdateGameMap();
             map?.SetupMap();
-            Log("UpdateGameMap() = " + updated);
         }
 
         public List<IMenuMod.MenuEntry> GetMenuData(IMenuMod.MenuEntry? toggleButtonEntry)
