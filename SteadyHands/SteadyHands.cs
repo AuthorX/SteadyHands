@@ -24,9 +24,8 @@ namespace SteadyHands
     public class SteadyHandsMod : Mod, IGlobalSettings<GlobalSettingsClass>, IMenuMod, ITogglableMod
     {
         private static SteadyHandsMod? _instance;
-        private static GameManager gm = GameManager.instance;
+        private static GameManager gm;
         private static GameMap? map;
-        //private static PlayerData playerData = PlayerData.instance;
         private static PlayMakerFSM? quickmapFSM;
         private static readonly string[] mapBools = {
             "mapCrossroads",
@@ -76,6 +75,8 @@ namespace SteadyHands
 
         public override void Initialize()
         {
+            Log("Initializing");
+            gm = GameManager.instance;
             On.GameMap.Start += GameMap_Start;
             On.SceneManager.AddSceneMapped += SceneManager_AddSceneMapped;
             ModHooks.GetPlayerBoolHook += PlayerBool;
@@ -87,6 +88,13 @@ namespace SteadyHands
             if (quickmapFSM is not null) EditQuickMapFSM(quickmapFSM);
 
             Log("Initialized");
+        }
+
+        public void Unload()
+        {
+            On.GameMap.Start -= GameMap_Start;
+            On.SceneManager.AddSceneMapped -= SceneManager_AddSceneMapped;
+            ModHooks.GetPlayerBoolHook -= PlayerBool;
         }
 
         private void ILHookCustomMapBools(ILContext il)
@@ -182,8 +190,11 @@ namespace SteadyHands
 
         private void ForceUpdateGameMap()
         {
-            gm?.UpdateGameMap();
+            LogDebug("Forcing game map update. gm null? + " + (gm == null) + "; map null? " + (map == null));
+            var updated = gm?.UpdateGameMap();
+            LogDebug("finished updating map, result: " + updated);
             map?.SetupMap();
+            LogDebug("finished forcing map setup");
         }
 
         public List<IMenuMod.MenuEntry> GetMenuData(IMenuMod.MenuEntry? toggleButtonEntry)
@@ -218,11 +229,5 @@ namespace SteadyHands
             };
         }
 
-        public void Unload()
-        {
-            On.GameMap.Start -= GameMap_Start;
-            On.SceneManager.AddSceneMapped -= SceneManager_AddSceneMapped;
-            ModHooks.GetPlayerBoolHook -= PlayerBool;
-        }
     }
 }
