@@ -80,12 +80,13 @@ namespace SteadyHands
             On.GameMap.Start += GameMap_Start;
             On.SceneManager.AddSceneMapped += SceneManager_AddSceneMapped;
             ModHooks.GetPlayerBoolHook += PlayerBool;
-            On.PlayMakerFSM.OnEnable += GetFSM;
+            if (quickmapFSM is null)
+                On.PlayMakerFSM.OnEnable += GetFSM;
+            else
+                EditQuickMapFSM(quickmapFSM);
             //On.GameMap.WorldMap += GameMap_WorldMap;
             IL.GameMap.WorldMap += ILHookCustomMapBools;
             IL.PlayerData.HasMapForScene += ILHookCustomMapBools;
-
-            if (quickmapFSM is not null) EditQuickMapFSM(quickmapFSM);
 
             Log("Initialized");
         }
@@ -95,6 +96,11 @@ namespace SteadyHands
             On.GameMap.Start -= GameMap_Start;
             On.SceneManager.AddSceneMapped -= SceneManager_AddSceneMapped;
             ModHooks.GetPlayerBoolHook -= PlayerBool;
+            On.PlayMakerFSM.OnEnable -= GetFSM;
+            if (quickmapFSM is not null) RestoreQuickMapFSM(quickmapFSM);
+
+            IL.GameMap.WorldMap -= ILHookCustomMapBools;
+            IL.PlayerData.HasMapForScene -= ILHookCustomMapBools;
         }
 
         private void ILHookCustomMapBools(ILContext il)
@@ -137,16 +143,29 @@ namespace SteadyHands
             }
         }
 
-        private void EditQuickMapFSM(PlayMakerFSM self)
+        private void EditQuickMapFSM(PlayMakerFSM fsm)
         {
-            quickmapFSM = self;
+            quickmapFSM = fsm;
             LogDebug("Editing Quick Map FSM");
-            var states = self.FsmStates;
+            var states = fsm.FsmStates;
             foreach (FsmState state in states)
             {
                 var action = state.GetFirstActionOfType<PlayerDataBoolTest>();
                 if(action is not null && mapBools.Contains(action.boolName.ToString()))
                     action.boolName += "_custom";
+            }
+            LogDebug("Finished editing Quick Map FSM");
+        }
+
+        private void RestoreQuickMapFSM(PlayMakerFSM fsm)
+        {
+            LogDebug("Reversing edits to Quick Map FSM");
+            var states = fsm.FsmStates;
+            foreach (FsmState state in states)
+            {
+                var action = state.GetFirstActionOfType<PlayerDataBoolTest>();
+                if (action is not null && mapBools.Contains(action.boolName.ToString().Replace("_custom","")))
+                    action.boolName = action.boolName.ToString().Replace("_custom", "");
             }
             LogDebug("Finished editing Quick Map FSM");
         }
