@@ -7,6 +7,7 @@ using HutongGames.PlayMaker.Actions;
 using MonoMod.Cil;
 using Mono.Cecil.Cil;
 using System.Linq;
+using UnityEngine;
 
 namespace SteadyHands
 {
@@ -42,6 +43,7 @@ namespace SteadyHands
             "mapRestingGround",
             "mapAbyss"
         };
+        private bool ignoreBoolHook = false;
 
         public GlobalSettingsClass gs { get; set; } = new GlobalSettingsClass();
         public void OnLoadGlobal(GlobalSettingsClass s) => gs = s;
@@ -79,6 +81,7 @@ namespace SteadyHands
             gm = GameManager.instance;
             On.GameMap.Start += GameMap_Start;
             On.SceneManager.AddSceneMapped += SceneManager_AddSceneMapped;
+            On.RoughMapRoom.OnEnable += RoughMapRoom_OnEnable;
             ModHooks.GetPlayerBoolHook += PlayerBool;
             if (quickmapFSM is null)
                 On.PlayMakerFSM.OnEnable += GetFSM;
@@ -90,7 +93,6 @@ namespace SteadyHands
 
             Log("Initialized");
         }
-
         public void Unload()
         {
             On.GameMap.Start -= GameMap_Start;
@@ -102,6 +104,20 @@ namespace SteadyHands
             IL.GameMap.WorldMap -= ILHookCustomMapBools;
             IL.PlayerData.HasMapForScene -= ILHookCustomMapBools;
         }
+
+        private void RoughMapRoom_OnEnable(On.RoughMapRoom.orig_OnEnable orig, RoughMapRoom self)
+        {
+            orig(self);
+            Log("RoughMapRoom_OnEnable: " + self.name);
+            bool hasMap = ReflectionHelper.CallMethod<PlayerData, bool>(gm.playerData, "HasMapForScene", self.transform.name);
+            Log("Before setting ignore bool, HasMapForScene = " + hasMap);
+            ignoreBoolHook = true;
+            hasMap = ReflectionHelper.CallMethod<PlayerData,bool>(gm.playerData,"HasMapForScene",self.transform.name);
+            Log("After setting ignore bool, HasMapForScene = " + hasMap);
+            ignoreBoolHook = false;
+            self.GetComponent<SpriteRenderer>().enabled = hasMap || self.fullSpriteDisplayed;
+        }
+
 
         private void ILHookCustomMapBools(ILContext il)
         {
@@ -127,8 +143,12 @@ namespace SteadyHands
             if (name.Contains("_custom"))
             {
                 string origName = name.Replace("_custom", "");
+                LogDebug("Hooking PlayerBool " + name + ", ignoreBoolHook = " + ignoreBoolHook);
                 if (mapBools.Contains(origName))
+                {
+                    if (ignoreBoolHook) return gm.playerData.GetBool(origName);
                     return gm.playerData.GetBool(origName) || (!gs.needsAreaMap && ls.seenAreas.Contains(origName));
+                }
             }
             return orig;
         }
@@ -209,11 +229,8 @@ namespace SteadyHands
 
         private void ForceUpdateGameMap()
         {
-            LogDebug("Forcing game map update. gm null? + " + (gm == null) + "; map null? " + (map == null));
             var updated = gm?.UpdateGameMap();
-            LogDebug("finished updating map, result: " + updated);
             map?.SetupMap();
-            LogDebug("finished forcing map setup");
         }
 
         public List<IMenuMod.MenuEntry> GetMenuData(IMenuMod.MenuEntry? toggleButtonEntry)
